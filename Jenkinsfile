@@ -1,4 +1,3 @@
-
 pipeline {
     agent any
 
@@ -29,7 +28,6 @@ pipeline {
         }
 
         stage('Unit Test') {
-           
             steps {
                 sh 'mvn test'
             }
@@ -116,6 +114,18 @@ pipeline {
                             string(name: 'IMAGE_TAG', value: "${env.IMAGE_TAG}")
                         ],
                         wait: false
+                }
+            }
+        }
+
+        stage('Notify Slack - CI Success') {
+            steps {
+                withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_WEBHOOK')]) {
+                    sh """
+                    curl -X POST -H 'Content-type: application/json' \
+                        --data '{"text":"🎉 CI pipeline succeeded for *${BRANCH_NAME}* branch. Image pushed: *${IMAGE_NAME}:${IMAGE_TAG}*"}' \
+                        $SLACK_WEBHOOK
+                    """
                 }
             }
         }
