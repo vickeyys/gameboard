@@ -105,6 +105,32 @@ pipeline {
             }
         }
 
+        stage('Update Manifests in GitOps Repo') {
+            steps {
+                script {
+                    // manifest repo path clone
+                    dir('manifest-repo') {
+                        git branch: "main",
+                            credentialsId: 'git-cred',
+                            url: 'https://github.com/vickeyys/boardgame-manifest.git'
+
+                        // select correct manifest path based on branch
+                        def manifestPath = (env.BRANCH_NAME == 'main') ? "prod/deployment.yaml" : "dev/deployment.yaml"
+
+                        // update image line
+                        sh """
+                            sed -i 's|image:.*|image: ${env.IMAGE_NAME}:${env.IMAGE_TAG}|' ${manifestPath}
+                            git config user.email "jenkins@ci.com"
+                            git config user.name "Jenkins CI"
+                            git add ${manifestPath}
+                            git commit -m "Update image to ${env.IMAGE_NAME}:${env.IMAGE_TAG} for ${env.BRANCH_NAME}"
+                            git push origin main
+                        """
+                    }
+                }
+            }
+        }
+
         stage('Trigger CD Pipeline') {
             steps {
                 script {
@@ -117,5 +143,5 @@ pipeline {
                 }
             }
         }
-    } // end of stages block
+    }
 }
