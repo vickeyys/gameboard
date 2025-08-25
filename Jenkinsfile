@@ -7,7 +7,7 @@ pipeline {
     }
 
     environment {
-        IMAGE_TAG  = "${BUILD_NUMBER}"  // default, will be overridden dynamically
+        IMAGE_TAG  = "${BUILD_NUMBER}"  // default, overridden dynamically
         IMAGE_NAME = ""                 // will be set dynamically based on branch
     }
 
@@ -36,7 +36,7 @@ pipeline {
                     withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_WEBHOOK')]) {
                         sh """
                         curl -X POST -H 'Content-type: application/json' \
-                            --data '{"text":"✅ Unit tests passed successfully for branch *${env.BRANCH_NAME}* build #${BUILD_NUMBER}"}' \
+                            --data '{"text":"✅ Unit tests passed for *${env.BRANCH_NAME}* build #${BUILD_NUMBER}"}' \
                             $SLACK_WEBHOOK
                         """
                     }
@@ -45,7 +45,7 @@ pipeline {
                     withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_WEBHOOK')]) {
                         sh """
                         curl -X POST -H 'Content-type: application/json' \
-                            --data '{"text":"❌ Unit tests failed for branch *${env.BRANCH_NAME}* build #${BUILD_NUMBER}"}' \
+                            --data '{"text":"❌ Unit tests failed for *${env.BRANCH_NAME}* build #${BUILD_NUMBER}"}' \
                             $SLACK_WEBHOOK
                         """
                     }
@@ -69,7 +69,7 @@ pipeline {
                         def reportUrl = "${buildUrl}artifact/trivy-fs-report.html"
                         sh """
                         curl -X POST -H 'Content-type: application/json' \
-                            --data '{"text":"📊 Trivy report is ready for branch *${env.BRANCH_NAME}*: <${reportUrl}|Download Report>"}' \
+                            --data '{"text":"📊 Trivy report ready for *${env.BRANCH_NAME}*: <${reportUrl}|Download Report>"}' \
                             $SLACK_WEBHOOK
                         """
                     }
@@ -117,16 +117,25 @@ pipeline {
                 }
             }
         }
+    } // end of stages block
 
-        stage('Notify Slack - CI Success') {
-            steps {
-                withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_WEBHOOK')]) {
-                    sh """
-                    curl -X POST -H 'Content-type: application/json' \
-                        --data '{"text":"🎉 CI pipeline succeeded for *${BRANCH_NAME}* branch. Image pushed: *${IMAGE_NAME}:${IMAGE_TAG}*"}' \
-                        $SLACK_WEBHOOK
-                    """
-                }
+    post {
+        success {
+            withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_WEBHOOK')]) {
+                sh """
+                curl -X POST -H 'Content-type: application/json' \
+                    --data '{"text":"🎉 CI pipeline succeeded for *${env.BRANCH_NAME}*. Image: *${env.IMAGE_NAME}:${env.IMAGE_TAG}*"}' \
+                    $SLACK_WEBHOOK
+                """
+            }
+        }
+        failure {
+            withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_WEBHOOK')]) {
+                sh """
+                curl -X POST -H 'Content-type: application/json' \
+                    --data '{"text":"🚨 CI pipeline FAILED for *${env.BRANCH_NAME}* build #${BUILD_NUMBER}"}' \
+                    $SLACK_WEBHOOK
+                """
             }
         }
     }
