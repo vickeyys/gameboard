@@ -7,8 +7,8 @@ pipeline {
     }
 
     environment {
-        IMAGE_TAG  = "${BUILD_NUMBER}"  // default, overridden dynamically
-        IMAGE_NAME = ""                 // will be set dynamically based on branch
+        IMAGE_TAG  = ""   // dynamically set
+        IMAGE_NAME = ""   // dynamically set
     }
 
     stages {
@@ -33,22 +33,10 @@ pipeline {
             }
             post {
                 success {
-                    withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_WEBHOOK')]) {
-                        sh """
-                        curl -X POST -H 'Content-type: application/json' \
-                            --data '{"text":"✅ Unit tests passed for *${env.BRANCH_NAME}* build #${BUILD_NUMBER}"}' \
-                            $SLACK_WEBHOOK
-                        """
-                    }
+                    notifySlack("✅ Unit tests passed for *${env.BRANCH_NAME}* build #${BUILD_NUMBER}")
                 }
                 failure {
-                    withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_WEBHOOK')]) {
-                        sh """
-                        curl -X POST -H 'Content-type: application/json' \
-                            --data '{"text":"❌ Unit tests failed for *${env.BRANCH_NAME}* build #${BUILD_NUMBER}"}' \
-                            $SLACK_WEBHOOK
-                        """
-                    }
+                    notifySlack("❌ Unit tests failed for *${env.BRANCH_NAME}* build #${BUILD_NUMBER}")
                 }
             }
         }
@@ -62,17 +50,9 @@ pipeline {
         stage('Upload Artifact & Notify Slack') {
             steps {
                 archiveArtifacts artifacts: 'trivy-fs-report.html', fingerprint: true
-
-                withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_WEBHOOK')]) {
-                    script {
-                        def buildUrl  = env.BUILD_URL
-                        def reportUrl = "${buildUrl}artifact/trivy-fs-report.html"
-                        sh """
-                        curl -X POST -H 'Content-type: application/json' \
-                            --data '{"text":"📊 Trivy report ready for *${env.BRANCH_NAME}*: <${reportUrl}|Download Report>"}' \
-                            $SLACK_WEBHOOK
-                        """
-                    }
+                script {
+                    def reportUrl = "${env.BUILD_URL}artifact/trivy-fs-report.html"
+                    notifySlack("📊 Trivy report ready for *${env.BRANCH_NAME}*: <${reportUrl}|Download Report>")
                 }
             }
         }
@@ -86,11 +66,9 @@ pipeline {
         stage('Docker Build & Push') {
             steps {
                 script {
-                    // Repo selection based on branch
                     def repo = (env.BRANCH_NAME == 'main') ? "vickeys/boardgame" : "vickeys/boardgame-dev"
                     def tag  = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
 
-                    // Export for CD pipeline
                     env.IMAGE_NAME = repo
                     env.IMAGE_TAG  = tag
 
@@ -99,8 +77,8 @@ pipeline {
                     withCredentials([usernamePassword(credentialsId: 'docker-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                         sh """
                             echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                            docker build -t ${repo}:${tag} .
-                            docker push ${repo}:${tag}
+                            docker build -t ${env.IMAGE_NAME}:${env.IMAGE_TAG} .
+                            docker push ${env.IMAGE_NAME}:${env.IMAGE_TAG}
                         """
                     }
                 }
@@ -117,13 +95,13 @@ pipeline {
 
                         def manifestPath = (env.BRANCH_NAME == 'main') ? "prod/deployment.yaml" : "dev/deployment.yaml"
 
-                        // Safe sed update
+                        // Update only container image line safely
                         sh """
-                            sed -i "s|image:.*|image: ${env.IMAGE_NAME}:${env.IMAGE_TAG}|" ${manifestPath}
+                            sed -i "/image:/c\\          image: ${env.IMAGE_NAME}:${env.IMAGE_TAG}" ${manifestPath}
                             git config user.email "jenkins@ci.com"
                             git config user.name "Jenkins CI"
                             git add ${manifestPath}
-                            git commit -m "Update image to ${env.IMAGE_NAME}:${env.IMAGE_TAG} for ${env.BRANCH_NAME}"
+                            git commit -m "Update image to ${env.IMAGE_NAME}:${env.IMAGE_TAG} for ${env.BRANCH_NAME}" || echo "No changes to commit"
                             git push origin main
                         """
                     }
@@ -143,5 +121,15 @@ pipeline {
                 }
             }
         }
+    }
+}
+
+def notifySlack(message) {
+    withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_WEBHOOK')]) {
+        sh """
+        curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"${message}"}' \
+            $SLACK_WEBHOOK
+        """
     }
 }
