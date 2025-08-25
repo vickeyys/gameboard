@@ -6,11 +6,6 @@ pipeline {
         maven 'maven3'
     }
 
-    environment {
-        IMAGE_TAG  = "${BUILD_NUMBER}"  // default, will be overridden dynamically
-        IMAGE_NAME = ""                 // will be set dynamically based on branch
-    }
-
     stages {
 
         stage('Git Checkout') {
@@ -28,7 +23,6 @@ pipeline {
         }
 
         stage('Unit Test') {
-           
             steps {
                 sh 'mvn test'
             }
