@@ -1,15 +1,9 @@
-
 pipeline {
     agent any
 
     tools {
         jdk 'jdk17'
         maven 'maven3'
-    }
-
-    environment {
-        IMAGE_TAG  = "${BUILD_NUMBER}"  // default, will be overridden dynamically
-        IMAGE_NAME = ""                 // will be set dynamically based on branch
     }
 
     stages {
@@ -29,7 +23,6 @@ pipeline {
         }
 
         stage('Unit Test') {
-           
             steps {
                 sh 'mvn test'
             }
