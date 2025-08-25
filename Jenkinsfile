@@ -94,6 +94,8 @@ pipeline {
                     env.IMAGE_NAME = repo
                     env.IMAGE_TAG  = tag
 
+                    echo "DEBUG -> IMAGE_NAME=${env.IMAGE_NAME}, IMAGE_TAG=${env.IMAGE_TAG}"
+
                     withCredentials([usernamePassword(credentialsId: 'docker-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                         sh """
                             echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
@@ -115,16 +117,15 @@ pipeline {
 
                         def manifestPath = (env.BRANCH_NAME == 'main') ? "prod/deployment.yaml" : "dev/deployment.yaml"
 
-                        withCredentials([usernamePassword(credentialsId: 'git-cred', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
-                            sh """
-                                sed -i 's|image:.*|image: ${env.IMAGE_NAME}:${env.IMAGE_TAG}|' ${manifestPath}
-                                git config user.email "jenkins@ci.com"
-                                git config user.name "Jenkins CI"
-                                git add ${manifestPath}
-                                git commit -m "Update image to ${env.IMAGE_NAME}:${env.IMAGE_TAG} for ${env.BRANCH_NAME}" || echo "No changes"
-                                git push https://${GIT_USER}:${GIT_PASS}@github.com/vickeyys/boardgame-manifest.git main
-                            """
-                        }
+                        // Safe sed update
+                        sh """
+                            sed -i "s|image:.*|image: ${env.IMAGE_NAME}:${env.IMAGE_TAG}|" ${manifestPath}
+                            git config user.email "jenkins@ci.com"
+                            git config user.name "Jenkins CI"
+                            git add ${manifestPath}
+                            git commit -m "Update image to ${env.IMAGE_NAME}:${env.IMAGE_TAG} for ${env.BRANCH_NAME}"
+                            git push origin main
+                        """
                     }
                 }
             }
