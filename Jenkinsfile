@@ -118,25 +118,4 @@ pipeline {
             }
         }
     } // end of stages block
-
-    post {
-        success {
-            withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_WEBHOOK')]) {
-                sh """
-                curl -X POST -H 'Content-type: application/json' \
-                    --data '{"text":"🎉 CI pipeline succeeded for *${env.BRANCH_NAME}*. Image: *${env.IMAGE_NAME}:${env.IMAGE_TAG}*"}' \
-                    $SLACK_WEBHOOK
-                """
-            }
-        }
-        failure {
-            withCredentials([string(credentialsId: 'slack-webhook', variable: 'SLACK_WEBHOOK')]) {
-                sh """
-                curl -X POST -H 'Content-type: application/json' \
-                    --data '{"text":"🚨 CI pipeline FAILED for *${env.BRANCH_NAME}* build #${BUILD_NUMBER}"}' \
-                    $SLACK_WEBHOOK
-                """
-            }
-        }
-    }
 }
