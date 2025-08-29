@@ -21,7 +21,7 @@ This web application displays lists of board games and their reviews. While anyo
 - JUnit test framework
 - Spring Security
 - Twitter Bootstrap
-  Mavenn
+  Maven
 
 ## Features
 
